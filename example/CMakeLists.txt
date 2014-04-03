@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 2.8.10)
+project(example)
+set(CMAKE_CXX_FLAGS "-std=c++11 -pedantic-errors -Wall ${CMAKE_CXX_FLAGS}")
+include_directories(${PROJECT_SOURCE_DIR}/../include)
+add_executable(example example.cxx)
