@@ -27,20 +27,34 @@ auto main()
   );
   */
   
+  // logging with default level
   log() << "hello, " << "logging" << "!";
   
+  // change default level
   log.default_level(log_level::debug);
   log() << "hello, logging with debug default level";
   
+  // logging with spcialized level
   log(log_level::debug) << "hi, level::debug";
   
-  log(log_level::debug) << "easy: hello, debug";
-  log(log_level::info)  << "easy: hello, info";
-  log(log_level::warn)  << "easy: hello, warn";
-  log(log_level::fatal) << "easy: hello, fatal";
+  log(log_level::debug) << "hello, debug";
+  log(log_level::info)  << "hello, info";
+  log(log_level::warn)  << "hello, warn";
+  log(log_level::fatal) << "hello, fatal";
   
+  // destruct hook
+  log.at_destruct
+  ( [](const log_t::data_type& data)
+    {
+      std::cerr << "===== at_destruct =====\n";
+      auto data_reverse = data;
+      data_reverse.reverse();
+      for(const auto& line : data_reverse)
+        std::cerr << to_string(line);
+    }
+  );
 }
-catch( const std::exception& e)
+catch( const std::exception& e )
 { std::cerr << "exception: " << e.what(); }
 catch( ... )
 { std::cerr << "unknown exception\n"; }
