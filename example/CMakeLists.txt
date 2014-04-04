@@ -30,8 +30,8 @@ else()
     set(CMAKE_CXX_FLAGS            "-Wall ${CMAKE_CXX_FLAGS}")
     set(CMAKE_CXX_FLAGS "-pedantic-errors ${CMAKE_CXX_FLAGS}")
     set(CMAKE_CXX_FLAGS_RELEASE        "-O3 -march=native -DNDEBUG")
-    set(CMAKE_CXX_FLAGS_DEBUG          "-O0 -march=native -g -pg")
-    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -march=native -g -pg")
+    set(CMAKE_CXX_FLAGS_DEBUG          "-O0 -march=native -g")
+    set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O3 -march=native -g")
   
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   
