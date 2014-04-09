@@ -2,7 +2,7 @@
 , "files" : [ { "git": 1 } ]
 , "build" :
   { "directory" : "build"
-  , "build"     : "zsh -exec 'cmake.ninja.clang++.debug ../example' && ninja"
+  , "build"     : "ninja"
   , "clean"     : "ninja clean"
   }
 }

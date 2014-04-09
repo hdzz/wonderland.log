@@ -50,7 +50,7 @@ auto main()
       auto data_reverse = data;
       data_reverse.reverse();
       for(const auto& line : data_reverse)
-        std::cerr << to_string(line);
+        std::cerr << line.to_string();
     }
   );
 }
