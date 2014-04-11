@@ -80,15 +80,15 @@ namespace wonder_rabbit_project
         
       public:
         template<class T>
-        auto operator<<(const T& a) -> log_stream_t&
+        auto operator<<(const T& value) -> log_stream_t&
         { 
-          (*_stream) << a;
+          (*_stream) << value;
           return *this;
         }
         
-        explicit log_stream_t(log_t& a, level_e b)
-          : _master(a)
-          , _level(b)
+        explicit log_stream_t(log_t& master, level_e level)
+          : _master(master)
+          , _level(level)
           , _stream(new std::ostringstream())
         { }
         
