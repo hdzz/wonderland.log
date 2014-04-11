@@ -182,6 +182,7 @@ namespace wonder_rabbit_project
       { _at_destruct_hook = std::move(h); }
     };
     
+    template<class T = void>
     static auto hook_tie(std::ostream& s) -> log_t::hook_type
     {
       return [&s](log_line_t& log_line) -> log_line_t&
