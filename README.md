@@ -1,6 +1,6 @@
-# libWRP-log
+# wonderland.log
 
-C++ logger header-only library.
+C++ logging header-only library.
 
 ## support
 
