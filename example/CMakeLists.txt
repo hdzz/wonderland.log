@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.10)
+cmake_minimum_required(VERSION 2.8.12)
 
 project(example)
 
@@ -11,6 +11,7 @@ if(CMAKE_CXX_COMPILER MATCHES "/em\\+\\+(-[a-zA-Z0-9.])?$")
   
   set(CMAKE_CXX_COMPILER_ID "Emscripten")
   
+  set(CMAKE_CXX_FLAGS      "-s ASM_JS=1 ${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS       "-std=c++11 ${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS            "-Wall ${CMAKE_CXX_FLAGS}")
   set(CMAKE_CXX_FLAGS "-pedantic-errors ${CMAKE_CXX_FLAGS}")

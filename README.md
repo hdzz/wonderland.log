@@ -4,9 +4,9 @@ C++ logging header-only library.
 
 ## support
 
-- GCC-4.8
-- Clang-3.2
-- Emscripten-1.12
+- GCC-4.8.2
+- Clang-3.3
+- Emscripten-1.20.0
 
 ## usage
 
