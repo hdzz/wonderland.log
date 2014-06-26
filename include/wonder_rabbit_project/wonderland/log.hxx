@@ -22,19 +22,61 @@
       #define WRP_WONDERLAND_LOG_SOURCE_POSITION 
     #endif
   
-    #define LOG  wonder_rabbit_project::wonderland::log::log_t::instance()() WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGD wonder_rabbit_project::wonderland::log::log_t::instance()( wonder_rabbit_project::wonderland::log::level::debug ) WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGI wonder_rabbit_project::wonderland::log::log_t::instance()( wonder_rabbit_project::wonderland::log::level::info  ) WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGW wonder_rabbit_project::wonderland::log::log_t::instance()( wonder_rabbit_project::wonderland::log::level::warn  ) WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGE wonder_rabbit_project::wonderland::log::log_t::instance()( wonder_rabbit_project::wonderland::log::level::error ) WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGF wonder_rabbit_project::wonderland::log::log_t::instance()( wonder_rabbit_project::wonderland::log::level::fatal ) WRP_WONDERLAND_LOG_SOURCE_POSITION
+    #define LOG_INSTANCE wonder_rabbit_project::wonderland::log::log_t::instance()
+  
+    #define LOG  LOG_INSTANCE() WRP_WONDERLAND_LOG_SOURCE_POSITION
+    #define LOGD LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::debug ) WRP_WONDERLAND_LOG_SOURCE_POSITION
+    #define LOGI LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::info  ) WRP_WONDERLAND_LOG_SOURCE_POSITION
+    #define LOGW LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::warn  ) WRP_WONDERLAND_LOG_SOURCE_POSITION
+    #define LOGE LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::error ) WRP_WONDERLAND_LOG_SOURCE_POSITION
+    #define LOGF LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::fatal ) WRP_WONDERLAND_LOG_SOURCE_POSITION
+    
+    #define LOG_CLEAR( a )  LOG_INSTANCE.clear( a )
+    #define LOG_BEGIN( a )  LOG_INSTANCE.begin( a )
+    #define LOG_END( a )    LOG_INSTANCE.end( a )
+    #define LOG_CBEGIN( a ) LOG_INSTANCE.cbegin( a )
+    #define LOG_CEND( a )   LOG_INSTANCE.cend( a )
+    #define LOG_STR( a )    LOG_INSTANCE.str( a )
+    
+    #define LOG_DEFAULT_LEVEL( a ) LOG_INSTANCE.default_level( a )
+    #define LOG_KEEP_LEVEL( a )    LOG_INSTANCE.keep_level( a )
+    #define LOG_HOOK_LEVEL( a )    LOG_INSTANCE.hook_level( a )
+    
+    #define LOG_HOOK( a )        LOG_INSTANCE.hook( a )
+    #define LOG_AT_DESTRUCT( a ) LOG_INSTANCE.at_destruct( a )
+    
+    #define LOG_THROW_IF_FATAL( a )  LOG_INSTANCE.throw_if_fatal( a )
+    #define LOG_START_TIME( a )      LOG_INSTANCE.start_time( a )
+    #define LOG_TIME_APPEARANCE( a ) LOG_INSTANCE.time_appearance( a )
+    
   #else
-    #define LOG  0
-    #define LOGD 0
-    #define LOGI 0
-    #define LOGW 0
-    #define LOGE 0
-    #define LOGF 0
+    #define LOG_INSTANCE wonder_rabbit_project::wonderland::log::log_t::instance()
+    
+    #define LOG  wonder_rabbit_project::wonderland::log::null_logger_t()
+    #define LOGD wonder_rabbit_project::wonderland::log::null_logger_t()
+    #define LOGI wonder_rabbit_project::wonderland::log::null_logger_t()
+    #define LOGW wonder_rabbit_project::wonderland::log::null_logger_t()
+    #define LOGE wonder_rabbit_project::wonderland::log::null_logger_t()
+    #define LOGF wonder_rabbit_project::wonderland::log::null_logger_t()
+    
+    #define LOG_CLEAR( a )  nullptr
+    #define LOG_BEGIN( a )  nullptr
+    #define LOG_END( a )    nullptr
+    #define LOG_CBEGIN( a ) nullptr
+    #define LOG_CEND( a )   nullptr
+    #define LOG_STR( a )    nullptr
+    
+    #define LOG_DEFAULT_LEVEL( a ) nullptr
+    #define LOG_KEEP_LEVEL( a )    nullptr
+    #define LOG_HOOK_LEVEL( a )    nullptr
+    
+    #define LOG_HOOK( a )        nullptr
+    #define LOG_AT_DESTRUCT( a ) nullptr
+    
+    #define LOG_THROW_IF_FATAL( a )  nullptr
+    #define LOG_START_TIME( a )      nullptr
+    #define LOG_TIME_APPEARANCE( a ) nullptr
+    
   #endif
 #endif
 
@@ -308,7 +350,7 @@ namespace wonder_rabbit_project
       };
       
       template < class T = void >
-      static auto hook_tie( std::ostream& s )
+      static auto hook_tee( std::ostream& s )
         -> log_t::hook_type
       {
         return [ &s ]( log_line_t& log_line )
@@ -350,6 +392,14 @@ namespace wonder_rabbit_project
         
         return r.str();
       }
+      
+      struct null_logger_t
+      { };
+      
+      template< class T >
+      auto operator<<( const null_logger_t& _, const T& )
+        -> const null_logger_t&
+      { return _; }
       
     }
   }
