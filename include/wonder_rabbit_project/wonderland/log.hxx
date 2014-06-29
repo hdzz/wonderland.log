@@ -16,20 +16,22 @@
 #ifndef WRP_WONDERLAND_LOG_NO_MACRO
   #ifndef WRP_WONDERLAND_LOG_DISABLE
   
-    #ifndef WRP_WONDERLAND_LOG_NO_SOURCE_POSITION
-      #define WRP_WONDERLAND_LOG_SOURCE_POSITION << __FILE__ << " " << __LINE__ << " "
+    #if defined( __Clang__ ) || defined( __GNUC__ )
+      #define WRP_WONDERLAND_LOG_FUNCTION __PRETTY_FUNCTION__
     #else
-      #define WRP_WONDERLAND_LOG_SOURCE_POSITION 
+      #define WRP_WONDERLAND_LOG_FUNCTION __func__
     #endif
+  
+    #define WRP_WONDERLAND_LOG_SOURCE_PARAMS __FILE__, __LINE__, WRP_WONDERLAND_LOG_FUNCTION
   
     #define LOG_INSTANCE wonder_rabbit_project::wonderland::log::log_t::instance()
   
-    #define LOG  LOG_INSTANCE() WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGD LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::debug ) WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGI LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::info  ) WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGW LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::warn  ) WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGE LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::error ) WRP_WONDERLAND_LOG_SOURCE_POSITION
-    #define LOGF LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::fatal ) WRP_WONDERLAND_LOG_SOURCE_POSITION
+    #define LOG  LOG_INSTANCE( WRP_WONDERLAND_LOG_SOURCE_PARAMS )
+    #define LOGD LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::debug, WRP_WONDERLAND_LOG_SOURCE_PARAMS )
+    #define LOGI LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::info , WRP_WONDERLAND_LOG_SOURCE_PARAMS )
+    #define LOGW LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::warn , WRP_WONDERLAND_LOG_SOURCE_PARAMS )
+    #define LOGE LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::error, WRP_WONDERLAND_LOG_SOURCE_PARAMS )
+    #define LOGF LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::fatal, WRP_WONDERLAND_LOG_SOURCE_PARAMS )
     
     #define LOG_CLEAR( a )  LOG_INSTANCE.clear( a )
     #define LOG_BEGIN( a )  LOG_INSTANCE.begin( a )
@@ -138,8 +140,11 @@ namespace wonder_rabbit_project
       struct log_line_t
       {
         std::chrono::time_point< std::chrono::high_resolution_clock > time;
-        level       level;
-        std::string message;
+        level         level;
+        std::string   source_file;
+        std::uint32_t source_line;
+        std::string   source_function;
+        std::string   message;
         
         auto to_string() const
           -> std::string
@@ -159,7 +164,10 @@ namespace wonder_rabbit_project
         class log_stream_t
         {
           log_t& _master;
-          level  _level;
+          const level  _level;
+          const std::string&  _source_file;
+          const std::uint32_t _source_line;
+          const std::string&  _source_function;
           const std::shared_ptr<std::ostringstream> _stream;
           
         public:
@@ -171,9 +179,18 @@ namespace wonder_rabbit_project
             return *this;
           }
           
-          explicit log_stream_t( log_t& master, level level )
+          explicit log_stream_t
+          ( log_t&              master
+          , const level         level
+          , const std::string&& source_file
+          , const std::uint32_t source_line
+          , const std::string&& source_function
+          )
             : _master( master )
             , _level( level )
+            , _source_file( std::move( source_file ) )
+            , _source_line( source_line )
+            , _source_function( std::move( source_function ) )
             , _stream( new std::ostringstream() )
           { }
           
@@ -182,6 +199,9 @@ namespace wonder_rabbit_project
             _master._append
             ( { std::chrono::high_resolution_clock::now()
               , _level
+              , _source_file
+              , _source_line
+              , _source_function
               , _stream -> str()
               }
             );
@@ -258,13 +278,22 @@ namespace wonder_rabbit_project
           _at_destruct_hook( _log );
         }
         
-        auto operator()()
+        auto operator()
+        ( std::string&& source_file     = ""
+        , uint32_t      source_line     = 0
+        , std::string&& source_function = ""
+        )
           -> log_stream_t
-        { return ( *this )( _default_level ); }
+        { return ( *this )( _default_level, std::move( source_file ), source_line, std::move( source_function ) ); }
 
-        auto operator()( level level )
+        auto operator()
+        ( level level
+        , std::string&& source_file     = ""
+        , uint32_t      source_line     = 0
+        , std::string&& source_function = ""
+        )
           -> log_stream_t
-        { return log_stream_t( *this, level ); }
+        { return log_stream_t( *this, level, std::move( source_file ), source_line, std::move( source_function ) ); }
         
         auto clear()
           -> void
@@ -385,6 +414,12 @@ namespace wonder_rabbit_project
           << std::setw( level_string_length )
           << std::left
           << log::to_string( level )
+          << "\t"
+          << source_file
+          << "\t"
+          << source_line
+          << "\t"
+          << source_function
           << "\t"
           << message
           << "\n"

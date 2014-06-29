@@ -46,6 +46,7 @@ auto main()
   
   // not throw if fatal ( default: true )
   LOG_THROW_IF_FATAL( false );
+  LOG << "LOG_THROW_IF_FATAL: " << std::boolalpha << LOG_THROW_IF_FATAL();
   
   // logging with spcialized level
   LOGD << "hello, LOGD macro";
@@ -62,6 +63,16 @@ auto main()
   log( log::level::fatal ) << __FILE__ << " " << __LINE__ << " " << "hello, fatal";
   */
   
+  {
+    struct A
+    {
+      A()  { LOGD << "hello A :)"; }
+      ~A() { LOGD << "bye A -)"; }
+    } a;
+  }
+  
+  [](){ LOGD << "hello lambda-expression!"; }();
+  
   // destruct hook
   LOG_AT_DESTRUCT
   ( []( const log::log_t::data_type& data )
@@ -75,6 +86,7 @@ auto main()
   );
   
   LOG_THROW_IF_FATAL( true );
+  LOG << "LOG_THROW_IF_FATAL: " << std::boolalpha << LOG_THROW_IF_FATAL();
   LOGF << "＼(^o^)／";
 }
 catch( const std::exception& e )
