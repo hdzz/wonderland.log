@@ -12,6 +12,8 @@
 #include <functional>
 #include <stdexcept>
 #include <ctime>
+#include <vector>
+#include <iterator>
 
 #ifndef WRP_WONDERLAND_LOG_NO_MACRO
   #ifndef WRP_WONDERLAND_LOG_DISABLE
@@ -33,21 +35,13 @@
     #define LOGE LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::error, WRP_WONDERLAND_LOG_SOURCE_PARAMS )
     #define LOGF LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::fatal, WRP_WONDERLAND_LOG_SOURCE_PARAMS )
     
-    #define LOG_CLEAR( a )  LOG_INSTANCE.clear( a )
-    #define LOG_BEGIN( a )  LOG_INSTANCE.begin( a )
-    #define LOG_END( a )    LOG_INSTANCE.end( a )
-    #define LOG_CBEGIN( a ) LOG_INSTANCE.cbegin( a )
-    #define LOG_CEND( a )   LOG_INSTANCE.cend( a )
-    #define LOG_STR( a )    LOG_INSTANCE.str( a )
-    
     #define LOG_DEFAULT_LEVEL( a ) LOG_INSTANCE.default_level( a )
     #define LOG_KEEP_LEVEL( a )    LOG_INSTANCE.keep_level( a )
-    #define LOG_HOOK_LEVEL( a )    LOG_INSTANCE.hook_level( a )
     
-    #define LOG_HOOK( a )        LOG_INSTANCE.hook( a )
+    #define LOG_HOOKS( a )       LOG_INSTANCE.hooks( a )
     #define LOG_AT_DESTRUCT( a ) LOG_INSTANCE.at_destruct( a )
     
-    #define LOG_THROW_IF_FATAL( a )  LOG_INSTANCE.throw_if_fatal( a )
+    #define LOG_IF_FATAL( a )        LOG_INSTANCE.if_fatal( a )
     #define LOG_START_TIME( a )      LOG_INSTANCE.start_time( a )
     #define LOG_TIME_APPEARANCE( a ) LOG_INSTANCE.time_appearance( a )
     
@@ -61,21 +55,13 @@
     #define LOGE wonder_rabbit_project::wonderland::log::null_logger_t()
     #define LOGF wonder_rabbit_project::wonderland::log::null_logger_t()
     
-    #define LOG_CLEAR( a )  nullptr
-    #define LOG_BEGIN( a )  nullptr
-    #define LOG_END( a )    nullptr
-    #define LOG_CBEGIN( a ) nullptr
-    #define LOG_CEND( a )   nullptr
-    #define LOG_STR( a )    nullptr
-    
     #define LOG_DEFAULT_LEVEL( a ) nullptr
     #define LOG_KEEP_LEVEL( a )    nullptr
-    #define LOG_HOOK_LEVEL( a )    nullptr
     
     #define LOG_HOOK( a )        nullptr
     #define LOG_AT_DESTRUCT( a ) nullptr
     
-    #define LOG_THROW_IF_FATAL( a )  nullptr
+    #define LOG_IF_FATAL( a )        nullptr
     #define LOG_START_TIME( a )      nullptr
     #define LOG_TIME_APPEARANCE( a ) nullptr
     
@@ -98,6 +84,20 @@ namespace wonder_rabbit_project
       , fatal = 5
       };
       
+      auto to_string( level ) -> std::string;
+      auto operator<<( std::ostream& o, level ) -> std::ostream&;
+      
+      enum class if_fatal
+        : std::uint8_t
+      { none
+      , exit
+      , quick_exit
+      , exception
+      };
+      
+      auto to_string( if_fatal ) -> std::string;
+      auto operator<<( std::ostream& o, if_fatal ) -> std::ostream&;
+      
       enum class time_appearance
       { f64_in_seconds_from_run
       , i64_in_seconds_from_epoch
@@ -111,26 +111,12 @@ namespace wonder_rabbit_project
         { }
       };
       
-      static auto to_string( level a )
-        -> std::string
-      {
-        switch( a )
-        { case level::none : return "none";
-          case level::debug: return "debug";
-          case level::info : return "info";
-          case level::warn : return "warn";
-          case level::error: return "error";
-          case level::fatal: return "fatal";
-        }
-        throw std::logic_error("unknown level value");
-      }
-      
       template < class T_clock = std::chrono::high_resolution_clock >
       auto to_string_iso8601( const typename T_clock::time_point& t )
         -> std::string
       {
         auto ct = T_clock::to_time_t( t );
-        std::string r = "0000-00-00T00:00:00Z";
+        std::string r = "0000-00-00T00:00:00Z.";
         std::strftime( const_cast< char* >( r.data() ), r.size(), "%FT%TZ", std::gmtime( &ct ) );
         return r;
       }
@@ -157,9 +143,9 @@ namespace wonder_rabbit_project
         friend struct log_line_t;
         
       public:
-        using data_type = std::forward_list< log_line_t >;
-        using hook_type = std::function< auto ( log_line_t& ) -> log_line_t& >;
-        using destruct_hook_type = std::function< auto ( const data_type& ) -> void >;
+        using hook_type          = std::function< auto ( log_line_t& ) -> void >;
+        using hooks_type         = std::vector< hook_type >;
+        using destruct_hook_type = std::function< auto ( ) -> void >;
         
         class log_stream_t
         {
@@ -196,60 +182,117 @@ namespace wonder_rabbit_project
           
           ~log_stream_t()
           {
-            _master._append
-            ( { std::chrono::high_resolution_clock::now()
-              , _level
-              , _source_file
-              , _source_line
-              , _source_function
-              , _stream -> str()
-              }
-            );
+            try
+            {
+              _master._append
+              ( { std::chrono::high_resolution_clock::now()
+                , _level
+                , _source_file
+                , _source_line
+                , _source_function
+                , _stream -> str()
+                }
+              );
+            }
+            catch( const std::exception& e )
+            {
+              std::cerr
+                << "[WARNING] occurred exception, but here is a destructor of log_stream_t class."
+                   " then the exception reserve the next log_t any function call timing.\n"
+                   "  exception type name: " << typeid( e ).name() << "\n"
+                   "  exception what     : " << e.what() << "\n"
+                ;
+              _master._exception_ptr = std::current_exception();
+            }
+            catch( ... )
+            {
+              std::cerr
+                << "[WARNING] occurred exception, but here is a destructor of log_stream_t class."
+                   " then the exception reserve the next log_t any function call timing.\n"
+                   "  exception type name: ... \n"
+                   "  exception what     : \n"
+                ;
+              _master._exception_ptr = std::current_exception();
+            }
           }
         };
         
       private:
         
-        data_type _log;
-        
         level   _default_level;
         level   _keep_level;
-        level   _hook_level;
         
-        hook_type          _hook;
+        hooks_type         _hooks;
         destruct_hook_type _at_destruct_hook;
         
         const std::chrono::high_resolution_clock::time_point _start_time;
-        bool _throw_if_fatal;
         log::time_appearance _time_appearance;
         
-        auto _append( log_line_t&& line )
-          -> void
-        {
-          if ( std::uint8_t( line.level ) >= std::uint8_t( _hook_level ) )
-            _hook(line);
-          
-          if ( std::uint8_t( line.level ) >= std::uint8_t( _keep_level ) )
-            _log.emplace_front( std::move(line) );
-          
-          if ( line.level == level::fatal && _throw_if_fatal )
-            throw fatal_exception( line.to_string() );
-        }
+        log::if_fatal      _if_fatal;
+        std::exception_ptr _exception_ptr;
         
-        log_t()
+        std::function< auto ( log_line_t&& line ) -> void > _append;
+        
+        log_t( )
           : _default_level( level::info )
           , _keep_level( level::debug )
-          , _hook_level( level::none )
-          , _hook( []( log_line_t& line ) -> log_line_t& { return line; } )
-          , _at_destruct_hook( []( const data_type& ){} )
+          , _hooks( { [ ]( log_line_t& log_line ) { std::cerr << log_line.to_string( ); } } )
+          , _at_destruct_hook( [ ]( ){ } )
           , _start_time( std::chrono::high_resolution_clock::now() )
-          , _throw_if_fatal( true )
           , _time_appearance( log::time_appearance::f64_in_seconds_from_run )
+          , _if_fatal( log::if_fatal::none )
+          , _exception_ptr( nullptr )
         {
-          ( *this )( level::info )
-            << "login time: "
-            << to_string_iso8601( _start_time )
-            ;
+          const auto append_default = [ this ]
+            ( log_line_t&& line )
+            {
+              this -> rethrow();
+              
+              if ( std::uint8_t( line.level ) >= std::uint8_t( this -> _keep_level ) )
+                for ( const auto& hook : this -> _hooks )
+                  hook( line );
+              
+              if ( line.level == level::fatal )
+              {
+                std::cerr << "[WARNING] detect a `fatal` level log and the if_fatal flag is ";
+                
+                switch( this -> _if_fatal )
+                { case log::if_fatal::none:
+                    std::cerr << " `if_fatal::none` then nothing to do.\n";
+                    break;
+                  
+                  case log::if_fatal::exit:
+                    std::cerr << " `if_fatal::exit` then call std::exit( 1 ) now.\n";
+                    std::exit( 1 );
+                  
+                  case log::if_fatal::quick_exit:
+                    std::cerr << " `if_fatal::quick_exit` then call std::quick_exit( 1 ) now.\n";
+                    std::quick_exit( 1 );
+                  
+                  case log::if_fatal::exception:
+                    std::cerr << " `if_fatal::exception` then throw fatal_exception now.\n";
+                    throw fatal_exception( line.to_string() );
+                }
+              }
+            };
+          
+          _append = [ this, append_default ]
+            ( log_line_t&& line )
+            {
+              append_default
+              ( { _start_time
+                , level::info
+                , ""
+                , 0
+                , ""
+                , std::string("login time: ") + to_string_iso8601( _start_time )
+                }
+              );
+              
+              append_default( std::move( line ) );
+              
+              this -> _append = append_default;
+            };
         }
         
         log_t( const log_t& ) = delete;
@@ -258,24 +301,49 @@ namespace wonder_rabbit_project
         auto operator=( const log_t& ) -> void = delete;
         auto operator=( log_t&& ) -> void = delete;
         
+        auto rethrow() const
+          -> void
+        {
+          if( _exception_ptr != nullptr )
+            std::rethrow_exception( _exception_ptr );
+        }
+        
       public:
         
-        static
+        static inline
         auto instance( )
           -> log_t&
         {
-          static const auto i = std::unique_ptr< log_t >( new log_t() );
-          return *i;
+          static log_t instance;
+          instance.rethrow();
+          return instance;
         }
         
-        ~log_t()
+        ~log_t( )
         {
+          if ( _exception_ptr != nullptr )
+          {
+            std::cerr
+              << "[WARNING] log_t has reserved exception, but here is destructor of log_t class."
+                 " then show the exception detail if exception based on std::exception,"
+                 " and std::quick_exit( 1 ) now.\n  "
+              ;
+            
+            try
+            { std::rethrow_exception( _exception_ptr ); }
+            catch( const std::exception& e )
+            { std::cerr << typeid( e ).name() << " what: " << e.what() << "\n"; }
+            catch( ... )
+            { std::cerr << "unknown exception object."; }
+            
+            std::quick_exit( 1 );
+          }
+          
           ( *this )( level::info )
             << "logout time: "
             << to_string_iso8601( std::chrono::high_resolution_clock::now() )
             ;
-          
-          _at_destruct_hook( _log );
+          _at_destruct_hook( );
         }
         
         auto operator()
@@ -293,85 +361,93 @@ namespace wonder_rabbit_project
         , std::string&& source_function = ""
         )
           -> log_stream_t
-        { return log_stream_t( *this, level, std::move( source_file ), source_line, std::move( source_function ) ); }
-        
-        auto clear()
-          -> void
-        { _log.clear(); }
-        
-        auto begin()
-          -> decltype( data_type().begin() )
-        { return _log.begin(); }
-        
-        auto end()
-          -> decltype( data_type().end() )
-        { return _log.end(); }
-        
-        auto cbegin() const
-          -> decltype( data_type().cbegin() )
-        { return _log.cbegin(); }
-        
-        auto cend() const
-          -> decltype( data_type().cend() )
-        { return _log.cend(); }
-
-        auto str() const
-          -> std::string
         {
-          std::ostringstream r;
-          
-          for(auto line: _log)
-            r << line.to_string();
-          
-          return r.str();
+          rethrow();
+          return log_stream_t( *this, level, std::move( source_file ), source_line, std::move( source_function ) );
         }
         
         auto default_level( level level )
           -> void
-        { _default_level = level; }
+        {
+          rethrow();
+          _default_level = level;
+        }
         
         auto default_level() const
           -> level
-        { return _default_level; }
+        {
+          rethrow();
+          return _default_level;
+        }
         
         auto keep_level( level level )
           -> void
-        { _keep_level = level; }
+        {
+          rethrow();
+          _keep_level = level;
+        }
         
         auto keep_level() const
           -> level
-        { return _keep_level; }
+        {
+          rethrow();
+          return _keep_level;
+        }
         
-        auto hook_level( level level )
+        auto hooks( hooks_type&& hs )
           -> void
-        { _hook_level = level; }
+        {
+          rethrow();
+          _hooks = std::move( hs );
+        }
         
-        auto hook_level() const
-          -> level
-        { return _hook_level; }
-        
-        auto hook( hook_type&& h )
+        auto hooks( const hooks_type& hs )
           -> void
-        { _hook = std::move( h ); }
+        {
+          rethrow();
+          _hooks = hs;
+        }
+        
+        auto hooks( )
+          -> hooks_type&
+        {
+          rethrow();
+          return _hooks;
+        }
         
         auto at_destruct( destruct_hook_type&& h ) -> void
-        { _at_destruct_hook = std::move( h ); }
+        {
+          rethrow();
+          _at_destruct_hook = std::move( h );
+        }
         
-        auto throw_if_fatal( bool enable )
+        auto if_fatal( log::if_fatal f )
           -> void
-        { _throw_if_fatal = enable; }
+        {
+          rethrow();
+          _if_fatal = f;
+        }
         
-        auto throw_if_fatal()
-          -> bool
-        { return _throw_if_fatal; }
+        auto if_fatal()
+          -> log::if_fatal
+        {
+          rethrow();
+          return _if_fatal;
+        }
         
         auto start_time()
           -> decltype( _start_time )
-        { return _start_time; }
+        {
+          rethrow();
+          return _start_time;
+        }
         
         auto time_appearance( log::time_appearance a )
           -> void
-        { _time_appearance = a; }
+        {
+          rethrow();
+          _time_appearance = a;
+        }
         
         auto time_appearance()
           -> log::time_appearance
@@ -379,15 +455,24 @@ namespace wonder_rabbit_project
       };
       
       template < class T = void >
-      static auto hook_tee( std::ostream& s )
+      static auto make_string_output_hook( std::ostream& s )
         -> log_t::hook_type
       {
-        return [ &s ]( log_line_t& log_line )
-          -> log_line_t&
-        {
-          s << log_line.to_string();
-          return log_line;
-        };
+        return [ &s ]( log_line_t& log_line ) { s << log_line.to_string(); };
+      }
+      /*
+      template < class T = void >
+      static auto make_string_output_hook( std::inserter& i )
+        -> log_t::hook_type
+      {
+        return [ &i ]( log_line_t& log_line ) { i << log_line.to_string(); };
+      }*/
+      
+      template < class T = void >
+      static auto make_string_output_hook( T& pushable )
+        -> log_t::hook_type
+      {
+        return [ &pushable ]( log_line_t& log_line ) { pushable.push( log_line.to_string() ); };
       }
       
       std::string log_line_t::to_string() const
@@ -435,6 +520,40 @@ namespace wonder_rabbit_project
       auto operator<<( const null_logger_t& _, const T& )
         -> const null_logger_t&
       { return _; }
+      
+      auto to_string( level l )
+        -> std::string
+      {
+        switch( l )
+        { case level::none : return "none";
+          case level::debug: return "debug";
+          case level::info : return "info";
+          case level::warn : return "warn";
+          case level::error: return "error";
+          case level::fatal: return "fatal";
+        }
+        throw std::logic_error("unknown level value");
+      }
+      
+      auto operator<<( std::ostream& o, level l )
+        -> std::ostream&
+      { return o << to_string( l ); }
+      
+      auto to_string( if_fatal f )
+        -> std::string
+      {
+        switch ( f )
+        { case if_fatal::none: return "none";
+          case if_fatal::exit: return "exit";
+          case if_fatal::quick_exit: return "quick_exit";
+          case if_fatal::exception : return "exception";
+        }
+        throw std::logic_error("unknown if_fatal value");
+      }
+      
+      auto operator<<( std::ostream& o, if_fatal f )
+        -> std::ostream&
+      { return o << to_string( f ); }
       
     }
   }

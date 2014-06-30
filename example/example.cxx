@@ -11,7 +11,6 @@
 
 auto main()
   -> int
-  try
 {
   using namespace wonder_rabbit_project::wonderland;
   
@@ -21,18 +20,14 @@ auto main()
   //   - demerit           : evil.
   // auto& log = log::log_t::instance();
   
-  // set a `tee` type hook with hook_tie helper function.
-  LOG_HOOK( log::hook_tee( std::cerr ) );
+  // set hook as like a `tee` with make_string_output_hook helper function.
+  //   log_t has one of std::cerr output hook for default construct.
+  //   the type of hooks is std::vector< hook_t >
+  //   and the type of hook_t is std::function< auto ( log::log_line_t&) -> void >.
+  //LOG_HOOKS( { log::make_string_output_hook( std::ofstream( "log.txt" ) ) } );
   
-  // set a `tee` type hook with lambda-expression.
-  //log.hook
-  //( []( log_line_t& a )
-  //    -> log_line_t&
-  //  {
-  //    std::cerr << to_string( a );
-  //    return a;
-  //  }
-  //);
+  // set hook as like a `tee` with lambda-expression.
+  //HOG_HOOKS( { []( log::log_line_t& a ) { std::ofstream( "log.txt" ) << a.to_string(); } } );
   
   // logging with default level
   //   - LOG[D,I,W,E,F] generate an ostream object then put any stringable object.
@@ -43,10 +38,6 @@ auto main()
   // change default level
   LOG_DEFAULT_LEVEL( log::level::debug );
   LOG << "hello, logging with debug default level";
-  
-  // not throw if fatal ( default: true )
-  LOG_THROW_IF_FATAL( false );
-  LOG << "LOG_THROW_IF_FATAL: " << std::boolalpha << LOG_THROW_IF_FATAL();
   
   // logging with spcialized level
   LOGD << "hello, LOGD macro";
@@ -74,22 +65,10 @@ auto main()
   [](){ LOGD << "hello lambda-expression!"; }();
   
   // destruct hook
-  LOG_AT_DESTRUCT
-  ( []( const log::log_t::data_type& data )
-    {
-      std::cerr << "===== at_destruct =====\n";
-      auto data_reverse = data;
-      data_reverse.reverse();
-      for ( const auto& line : data_reverse )
-        std::cerr << line.to_string();
-    }
-  );
+  LOG_AT_DESTRUCT( []{ LOGD << "===== LOG_AT_DESTRUCT =====\n"; } );
   
-  LOG_THROW_IF_FATAL( true );
-  LOG << "LOG_THROW_IF_FATAL: " << std::boolalpha << LOG_THROW_IF_FATAL();
+  LOG_IF_FATAL( log::if_fatal::exit );
+  LOG << "LOG_EXIT_IF_FATAL: " << LOG_IF_FATAL();
+  
   LOGF << "＼(^o^)／";
 }
-catch( const std::exception& e )
-{ std::cerr << "exception: " << e.what(); }
-catch( ... )
-{ std::cerr << "unknown exception\n"; }
