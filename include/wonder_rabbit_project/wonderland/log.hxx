@@ -15,6 +15,7 @@
 #include <vector>
 #include <iterator>
 #include <cstdlib>
+#include <iostream>
 
 #ifndef WRP_WONDERLAND_LOG_NO_MACRO
   #ifndef WRP_WONDERLAND_LOG_DISABLE
