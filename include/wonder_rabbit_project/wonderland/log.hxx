@@ -126,7 +126,7 @@ namespace wonder_rabbit_project
       struct log_line_t
       {
         std::chrono::time_point< std::chrono::high_resolution_clock > time;
-        level         level;
+        log::level    level;
         std::string   source_file;
         std::uint32_t source_line;
         std::string   source_function;
