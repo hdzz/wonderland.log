@@ -14,6 +14,7 @@
 #include <ctime>
 #include <vector>
 #include <iterator>
+#include <cstdlib>
 
 #ifndef WRP_WONDERLAND_LOG_NO_MACRO
   #ifndef WRP_WONDERLAND_LOG_DISABLE
@@ -74,6 +75,8 @@ namespace wonder_rabbit_project
   {
     namespace log
     {
+      using clock_t = std::chrono::steady_clock;
+      
       enum class level
         : std::uint8_t
       { none  = 0
@@ -111,13 +114,17 @@ namespace wonder_rabbit_project
         { }
       };
       
-      template < class T_clock = std::chrono::high_resolution_clock >
-      auto to_string_iso8601( const typename T_clock::time_point& t )
+      auto to_string_iso8601( const typename clock_t::time_point& t )
         -> std::string
       {
-        auto ct = T_clock::to_time_t( t );
+        using namespace std::chrono;
+        const time_t ct
+        ( ( duration_cast< seconds >( system_clock::now( ).time_since_epoch( ) )
+          + duration_cast< seconds >( t - clock_t::now( ) )
+          ).count( )
+        );
         std::string r = "0000-00-00T00:00:00Z.";
-        std::strftime( const_cast< char* >( r.data() ), r.size(), "%FT%TZ", std::gmtime( &ct ) );
+        std::strftime( const_cast< char* >( r.data( ) ), r.size( ), "%FT%TZ", std::gmtime( &ct ) );
         return r;
       }
       
@@ -125,7 +132,7 @@ namespace wonder_rabbit_project
       
       struct log_line_t
       {
-        std::chrono::time_point< std::chrono::high_resolution_clock > time;
+        std::chrono::time_point< clock_t > time;
         log::level    level;
         std::string   source_file;
         std::uint32_t source_line;
@@ -185,7 +192,7 @@ namespace wonder_rabbit_project
             try
             {
               _master._append
-              ( { std::chrono::high_resolution_clock::now()
+              ( { clock_t::now()
                 , _level
                 , _source_file
                 , _source_line
@@ -202,7 +209,11 @@ namespace wonder_rabbit_project
                    "  exception type name: " << typeid( e ).name() << "\n"
                    "  exception what     : " << e.what() << "\n"
                 ;
+#ifndef EMSCRIPTEN
               _master._exception_ptr = std::current_exception();
+#else
+              _master._pseudo_exception_ptr.reset( new fatal_exception( e.what() ) );
+#endif
             }
             catch( ... )
             {
@@ -212,7 +223,11 @@ namespace wonder_rabbit_project
                    "  exception type name: ... \n"
                    "  exception what     : \n"
                 ;
+#ifndef EMSCRIPTEN
               _master._exception_ptr = std::current_exception();
+#else
+              _master._pseudo_exception_ptr.reset( new fatal_exception( "..." ) );
+#endif
             }
           }
         };
@@ -225,11 +240,15 @@ namespace wonder_rabbit_project
         hooks_type         _hooks;
         destruct_hook_type _at_destruct_hook;
         
-        const std::chrono::high_resolution_clock::time_point _start_time;
+        const clock_t::time_point _start_time;
         log::time_appearance _time_appearance;
         
         log::if_fatal      _if_fatal;
+#ifndef EMSCRIPTEN
         std::exception_ptr _exception_ptr;
+#else
+        std::unique_ptr< fatal_exception > _pseudo_exception_ptr;
+#endif
         
         std::function< auto ( log_line_t&& line ) -> void > _append;
         
@@ -238,10 +257,14 @@ namespace wonder_rabbit_project
           , _keep_level( level::debug )
           , _hooks( { [ ]( log_line_t& log_line ) { std::cerr << log_line.to_string( ); } } )
           , _at_destruct_hook( [ ]( ){ } )
-          , _start_time( std::chrono::high_resolution_clock::now() )
+          , _start_time( clock_t::now() )
           , _time_appearance( log::time_appearance::f64_in_seconds_from_run )
           , _if_fatal( log::if_fatal::none )
+#ifndef EMSCRIPTEN
           , _exception_ptr( nullptr )
+#else
+          , _pseudo_exception_ptr( nullptr )
+#endif
         {
           const auto append_default = [ this ]
             ( log_line_t&& line )
@@ -262,12 +285,21 @@ namespace wonder_rabbit_project
                     break;
                   
                   case log::if_fatal::exit:
-                    std::cerr << " `if_fatal::exit` then call std::exit( 1 ) now.\n";
-                    std::exit( 1 );
+                    std::cerr << " `if_fatal::exit` then call std::exit( EXIT_FAILURE ) now.\n";
+                    std::exit( EXIT_FAILURE );
                   
                   case log::if_fatal::quick_exit:
-                    std::cerr << " `if_fatal::quick_exit` then call std::quick_exit( 1 ) now.\n";
-                    std::quick_exit( 1 );
+                    std::cerr << " `if_fatal::quick_exit` then call std::quick_exit( EXIT_FAILURE ) now.\n";
+#ifndef EMSCRIPTEN
+                    std::quick_exit( EXIT_FAILURE );
+#else
+                    std::cerr
+                      << "[WARNING] Emscripten is not support std::quick_exit yet,"
+                         " then call std::exit alternatively.\n"
+                      ;
+                    
+                    std::exit( EXIT_FAILURE );
+#endif
                   
                   case log::if_fatal::exception:
                     std::cerr << " `if_fatal::exception` then throw fatal_exception now.\n";
@@ -304,8 +336,19 @@ namespace wonder_rabbit_project
         auto rethrow() const
           -> void
         {
+#ifndef EMSCRIPTEN
           if( _exception_ptr != nullptr )
             std::rethrow_exception( _exception_ptr );
+#else
+          if( _pseudo_exception_ptr )
+          {
+            std::cerr
+              << "[WARNING] Emscripten is not support std::exception_ptr yet,"
+                 " then pseudo rethrow as throw exception.\n"
+              ;
+            throw *_pseudo_exception_ptr;
+          }
+#endif
         }
         
       public:
@@ -321,27 +364,44 @@ namespace wonder_rabbit_project
         
         ~log_t( )
         {
+#ifndef EMSCRIPTEN
           if ( _exception_ptr != nullptr )
+#else
+          if ( _pseudo_exception_ptr )
+#endif
           {
             std::cerr
               << "[WARNING] log_t has reserved exception, but here is destructor of log_t class."
                  " then show the exception detail if exception based on std::exception,"
-                 " and std::quick_exit( 1 ) now.\n  "
+                 " and std::quick_exit( EXIT_FAILURE ) now.\n  "
               ;
             
+#ifndef EMSCRIPTEN
             try
             { std::rethrow_exception( _exception_ptr ); }
             catch( const std::exception& e )
             { std::cerr << typeid( e ).name() << " what: " << e.what() << "\n"; }
             catch( ... )
             { std::cerr << "unknown exception object."; }
+#else
+            std::cerr << "fatal_exception what: " << _pseudo_exception_ptr -> what() << "\n";
+#endif
             
-            std::quick_exit( 1 );
+#ifndef EMSCRIPTEN
+            std::quick_exit( EXIT_FAILURE );
+#else
+            std::cerr
+              << "[WARNING] Emscripten is not support std::quick_exit yet,"
+                  " then call std::exit alternatively.\n"
+              ;
+            
+            std::exit( EXIT_FAILURE );
+#endif
           }
           
           ( *this )( level::info )
             << "logout time: "
-            << to_string_iso8601( std::chrono::high_resolution_clock::now() )
+            << to_string_iso8601( clock_t::now() )
             ;
           _at_destruct_hook( );
         }
@@ -426,6 +486,13 @@ namespace wonder_rabbit_project
         {
           rethrow();
           _if_fatal = f;
+#ifdef EMSCRIPTEN
+          if ( f == log::if_fatal::quick_exit )
+            std::cerr
+              << "[WARNING] Emscripten is not support std::quick_exit yet,"
+                 " then call std::exit if detect fatal with if_fatal flag equals quick_exit.\n"
+              ;
+#endif
         }
         
         auto if_fatal()
