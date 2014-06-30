@@ -88,7 +88,9 @@ namespace wonder_rabbit_project
       , fatal = 5
       };
       
+      template < class T = void >
       auto to_string( level ) -> std::string;
+      template < class T = void >
       auto operator<<( std::ostream& o, level ) -> std::ostream&;
       
       enum class if_fatal
@@ -99,7 +101,9 @@ namespace wonder_rabbit_project
       , exception
       };
       
+      template < class T = void >
       auto to_string( if_fatal ) -> std::string;
+      template < class T = void >
       auto operator<<( std::ostream& o, if_fatal ) -> std::ostream&;
       
       enum class time_appearance
@@ -115,6 +119,7 @@ namespace wonder_rabbit_project
         { }
       };
       
+      template < class T = void >
       auto to_string_iso8601( const typename clock_t::time_point& t )
         -> std::string
       {
@@ -139,11 +144,12 @@ namespace wonder_rabbit_project
         std::uint32_t source_line;
         std::string   source_function;
         std::string   message;
-        
-        auto to_string() const
-          -> std::string
-        ;
       };
+      
+      template < class T = void >
+      auto to_string( const log_line_t& ) -> std::string;
+      template < class T = void >
+      auto operator<<( std::ostream& o, const log_line_t& ) -> std::ostream&;
       
       class log_t final
       {
@@ -256,7 +262,7 @@ namespace wonder_rabbit_project
         log_t( )
           : _default_level( level::info )
           , _keep_level( level::debug )
-          , _hooks( { [ ]( log_line_t& log_line ) { std::cerr << log_line.to_string( ); } } )
+          , _hooks( { [ ]( log_line_t& log_line ) { std::cerr << log_line; } } )
           , _at_destruct_hook( [ ]( ){ } )
           , _start_time( clock_t::now() )
           , _time_appearance( log::time_appearance::f64_in_seconds_from_run )
@@ -304,7 +310,7 @@ namespace wonder_rabbit_project
                   
                   case log::if_fatal::exception:
                     std::cerr << " `if_fatal::exception` then throw fatal_exception now.\n";
-                    throw fatal_exception( line.to_string() );
+                    throw fatal_exception( to_string( line ) );
                 }
               }
             };
@@ -526,7 +532,7 @@ namespace wonder_rabbit_project
       static auto make_string_output_hook( std::ostream& s )
         -> log_t::hook_type
       {
-        return [ &s ]( log_line_t& log_line ) { s << log_line.to_string(); };
+        return [ &s ]( log_line_t& log_line ) { s << log_line; };
       }
       /*
       template < class T = void >
@@ -540,10 +546,12 @@ namespace wonder_rabbit_project
       static auto make_string_output_hook( T& pushable )
         -> log_t::hook_type
       {
-        return [ &pushable ]( log_line_t& log_line ) { pushable.push( log_line.to_string() ); };
+        return [ &pushable ]( log_line_t& log_line ) { pushable.push( to_string( log_line ) ); };
       }
       
-      std::string log_line_t::to_string() const
+      template < class T >
+      auto to_string( const log_line_t& log_line )
+        -> std::string
       {
         std::ostringstream r;
         
@@ -552,11 +560,11 @@ namespace wonder_rabbit_project
         
         r << std::fixed;
         
-        auto& l = log_t::instance();
+        auto& l = log_t::instance( );
         
-        switch( l._time_appearance )
+        switch( l.time_appearance( ) )
         { case log::time_appearance::f64_in_seconds_from_run:
-            r << duration_cast< duration< double > >( time - l._start_time ).count();
+            r << duration_cast< duration< double > >( log_line.time - l.start_time( ) ).count();
             break;
           default:
             ;
@@ -566,20 +574,25 @@ namespace wonder_rabbit_project
         r << " [s]\t"
           << std::setw( level_string_length )
           << std::left
-          << log::to_string( level )
+          << log::to_string( log_line.level )
           << "\t"
-          << source_file
+          << log_line.source_file
           << "\t"
-          << source_line
+          << log_line.source_line
           << "\t"
-          << source_function
+          << log_line.source_function
           << "\t"
-          << message
+          << log_line.message
           << "\n"
           ;
         
         return r.str();
       }
+      
+      template < class T >
+      auto operator<<( std::ostream& o, const log_line_t& log_line )
+        -> std::ostream&
+      { return o << to_string( log_line ); }
       
       struct null_logger_t
       { };
@@ -589,6 +602,7 @@ namespace wonder_rabbit_project
         -> const null_logger_t&
       { return _; }
       
+      template < class >
       auto to_string( level l )
         -> std::string
       {
@@ -603,10 +617,12 @@ namespace wonder_rabbit_project
         throw std::logic_error("unknown level value");
       }
       
+      template < class T >
       auto operator<<( std::ostream& o, level l )
         -> std::ostream&
       { return o << to_string( l ); }
       
+      template < class T >
       auto to_string( if_fatal f )
         -> std::string
       {
@@ -619,6 +635,7 @@ namespace wonder_rabbit_project
         throw std::logic_error("unknown if_fatal value");
       }
       
+      template < class T >
       auto operator<<( std::ostream& o, if_fatal f )
         -> std::ostream&
       { return o << to_string( f ); }
