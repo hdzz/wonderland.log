@@ -16,6 +16,7 @@
 #include <iterator>
 #include <cstdlib>
 #include <iostream>
+#include <mutex>
 
 #ifndef WRP_WONDERLAND_LOG_NO_MACRO
   #ifndef WRP_WONDERLAND_LOG_DISABLE
@@ -69,6 +70,14 @@
     
   #endif
 #endif
+
+namespace
+{
+#ifdef WRP_WONDERLAND_LOG_DECLARE_ONLY
+  extern
+#endif
+  std::mutex write_mutex;
+}
 
 namespace wonder_rabbit_project
 {
@@ -256,7 +265,16 @@ namespace wonder_rabbit_project
         log_t( )
           : _default_level( level::info )
           , _keep_level( level::debug )
-          , _hooks( { [ ]( log_line_t& log_line ) { std::cerr << log_line.to_string( ); } } )
+          , _hooks
+          (
+            {
+              [ ]( log_line_t& log_line )
+              {
+                std::lock_guard<std::mutex> l(write_mutex);
+                std::cerr << log_line.to_string( );
+              }
+            } 
+          )
           , _at_destruct_hook( [ ]( ){ } )
           , _start_time( clock_t::now() )
           , _time_appearance( log::time_appearance::f64_in_seconds_from_run )
