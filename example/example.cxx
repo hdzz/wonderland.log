@@ -27,7 +27,7 @@ auto main()
   //LOG_HOOKS( { log::make_string_output_hook( std::ofstream( "log.txt" ) ) } );
   
   // set hook as like a `tee` with lambda-expression.
-  //HOG_HOOKS( { []( log::log_line_t& a ) { std::ofstream( "log.txt" ) << a.to_string(); } } );
+  //HOG_HOOKS( { []( log::log_line_t& log_line ) { std::ofstream( "log.txt" ) << log_line; } } );
   
   // logging with default level
   //   - LOG[D,I,W,E,F] generate an ostream object then put any stringable object.
