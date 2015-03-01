@@ -2,15 +2,15 @@
 
 // use NDEBUG macro trick if you want.
 #ifdef NDEBUG
-  // to disable logger if define it.
-  //   recommend: use macro usage, then disable all of features define it only.
-  #define WRP_WONDERLAND_LOG_DISABLE
+// to disable logger if define it.
+//   recommend: use macro usage, then disable all of features define it only.
+#define WRP_WONDERLAND_LOG_DISABLE
 #endif
 
 #include <wonder_rabbit_project/wonderland/log.hxx>
 
 auto main()
-  -> int
+-> int
 {
   using namespace wonder_rabbit_project::wonderland;
   
@@ -36,7 +36,7 @@ auto main()
   LOG << "hello, " << "LOG ( logger address is " << std::hex << &LOG_INSTANCE << " ) " << "!";
   
   // change default level
-  LOG_DEFAULT_LEVEL( log::level::debug );
+  LOG_DEFAULT_LEVEL ( log::level::debug );
   LOG << "hello, logging with debug default level";
   
   // logging with spcialized level
@@ -47,11 +47,11 @@ auto main()
   LOGF << "hello, LOGF macro";
   // you can use logger directly if you not want to use macros.
   /*
-  log( log::level::debug ) << __FILE__ << " " << __LINE__ << " " << "hello, debug";
-  log( log::level::info  ) << __FILE__ << " " << __LINE__ << " " << "hello, info";
-  log( log::level::warn  ) << __FILE__ << " " << __LINE__ << " " << "hello, warn";
-  log( log::level::error ) << __FILE__ << " " << __LINE__ << " " << "hello, error";
-  log( log::level::fatal ) << __FILE__ << " " << __LINE__ << " " << "hello, fatal";
+    log( log::level::debug ) << __FILE__ << " " << __LINE__ << " " << "hello, debug";
+    log( log::level::info  ) << __FILE__ << " " << __LINE__ << " " << "hello, info";
+    log( log::level::warn  ) << __FILE__ << " " << __LINE__ << " " << "hello, warn";
+    log( log::level::error ) << __FILE__ << " " << __LINE__ << " " << "hello, error";
+    log( log::level::fatal ) << __FILE__ << " " << __LINE__ << " " << "hello, fatal";
   */
   
   {
@@ -62,12 +62,12 @@ auto main()
     } a;
   }
   
-  [](){ LOGD << "hello lambda-expression!"; }();
+  []() { LOGD << "hello lambda-expression!"; }();
   
   // destruct hook
-  LOG_AT_DESTRUCT( []{ LOGD << "===== LOG_AT_DESTRUCT =====\n"; } );
+  LOG_AT_DESTRUCT ( []{ LOGD << "===== LOG_AT_DESTRUCT =====\n"; } );
   
-  LOG_IF_FATAL( log::if_fatal::exit );
+  LOG_IF_FATAL ( log::if_fatal::exit );
   LOG << "LOG_EXIT_IF_FATAL: " << LOG_IF_FATAL();
   
   LOGF << "＼(^o^)／";
