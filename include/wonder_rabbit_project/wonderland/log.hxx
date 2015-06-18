@@ -423,14 +423,14 @@ namespace wonder_rabbit_project
 #else
             std::cerr << "fatal_exception what: " << _pseudo_exception_ptr -> what() << "\n";
 #endif
-#ifndef EMSCRIPTEN
-            std::quick_exit ( EXIT_FAILURE );
-#else
+#if defined( EMSCRIPTEN ) || defined( __MINGW32__ )
             std::cerr
-                << "[WARNING] Emscripten is not support std::quick_exit yet,"
+                << "[WARNING] Emscripten or MINGW is not support std::quick_exit yet,"
                 " then call std::exit alternatively.\n"
                 ;
             std::exit ( EXIT_FAILURE );
+#else
+            std::quick_exit ( EXIT_FAILURE );
 #endif
           }
           
