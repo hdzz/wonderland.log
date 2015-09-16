@@ -135,14 +135,20 @@ namespace wonder_rabbit_project
       auto to_string_iso8601 ( const typename clock_t::time_point& t )
       -> std::string
       {
+#ifdef _WIN32
+        // TDM-GCC-5.1.0 is not support %F and %T
+        //   note: mingw is supported. but we cannot predicate TDM or not.
+        constexpr auto format_date_time = "%Y-%m-%dT%H:%M:%S";
+#else
+        constexpr auto format_date_time = "%FT%T";
+#endif
         using namespace std::chrono;
-        const time_t ct
-        ( ( duration_cast< seconds > ( system_clock::now( ).time_since_epoch( ) )
-        + duration_cast< seconds > ( t - clock_t::now( ) )
-          ).count( )
-        );
-        std::string r = "0000-00-00T00:00:00Z.";
-        std::strftime ( const_cast< char* > ( r.data( ) ), r.size( ), "%FT%TZ", std::gmtime ( &ct ) );
+      
+        const time_t ct = duration_cast< seconds >( t.time_since_epoch() ).count();
+      
+        std::string r = "0000-00-00T00:00:00.Z";
+        std::strftime ( const_cast< char* > ( r.data( ) ), r.size( ), format_date_time, std::gmtime ( &ct ) );
+      
         return r;
       }
       
