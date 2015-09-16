@@ -386,9 +386,9 @@ namespace wonder_rabbit_project
         auto instance( )
         -> log_t&
         {
-          static log_t instance;
-          instance.rethrow();
-          return instance;
+          static auto instance = std::unique_ptr< log_t >( new log_t );
+          instance->rethrow();
+          return *instance;
         }
         
         ~log_t( )
