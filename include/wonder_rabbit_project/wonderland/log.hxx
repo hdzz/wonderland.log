@@ -1,5 +1,13 @@
 #pragma once
 
+#ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #define NOMINMAX
+  #include <windows.h>
+  #undef NOMINMAX
+  #undef WIN32_LEAN_AND_MEAN
+#endif
+
 #include <cstdint>
 #include <string>
 #include <array>
@@ -17,6 +25,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <mutex>
+#include <cmath>
 
 #ifndef WRP_WONDERLAND_LOG_NO_MACRO
 #ifndef WRP_WONDERLAND_LOG_DISABLE
@@ -49,6 +58,7 @@
 #define LOG_IF_FATAL( a )        LOG_INSTANCE.if_fatal( a )
 #define LOG_START_TIME( a )      LOG_INSTANCE.start_time( a )
 #define LOG_TIME_APPEARANCE( a ) LOG_INSTANCE.time_appearance( a )
+#define LOG_TIME_FORMAT( a )     LOG_INSTANCE.time_format( a )
 
 #else
 
@@ -72,6 +82,7 @@
 #define LOG_IF_FATAL( a )        nullptr
 #define LOG_START_TIME( a )      nullptr
 #define LOG_TIME_APPEARANCE( a ) nullptr
+#define LOG_TIME_FORMAT( a )     nullptr
 
 #endif
 #endif
@@ -90,7 +101,124 @@ namespace wonder_rabbit_project
   {
     namespace log
     {
-      using clock_t = std::chrono::steady_clock;
+      enum class time_format
+      {
+        gmt
+        , jst
+      };
+      
+      namespace detail
+      {
+#ifdef _WIN32
+        struct windows_high_performance_clock
+        {
+          using rep = long long;
+          using period = std::pico;
+          using duration = std::chrono::duration< rep, period >;
+          using time_point = std::chrono::time_point< windows_high_performance_clock >;
+          static const bool is_steady = true;
+          static time_point now()
+          {
+            LARGE_INTEGER frequency;
+            QueryPerformanceFrequency( &frequency );
+            
+            LARGE_INTEGER count;
+            QueryPerformanceCounter( &count );
+            return time_point( duration( count.QuadPart * static_cast< rep >( period::den ) / frequency.QuadPart ) );
+          }
+         };
+#endif
+        template < typename T >
+        inline static auto to_time_t( const T& t )
+        {
+          using std::chrono::system_clock;
+          using std::chrono::duration_cast;
+          const auto& dt = t - T::clock::now();
+          auto et = system_clock::now() + duration_cast<system_clock::duration>( dt );
+          return std::time_t( system_clock::to_time_t( et ) );
+        }
+
+#ifdef _WIN32
+          // TDM-GCC-5.1.0 is not support %F and %T
+          //   note: mingw is supported. but we cannot predicate TDM or not.
+        constexpr auto format_date_time_gmt = "%Y-%m-%dT%H:%M:%SZ";
+        constexpr auto format_date_time     = "%Y-%m-%dT%H:%M:%S";
+#else
+        constexpr auto format_date_time_gmt = "%FT%TZ";
+        constexpr auto format_date_time     = "%FT%T";
+#endif
+        constexpr auto format_time_zone = "%H:%M";
+        
+        template < typename T >
+        inline static auto to_string_iso8601_gmt ( const T& t = T::clock::now() )
+        {
+          using namespace std::chrono;
+        
+          const time_t& ct = detail::to_time_t( t );
+        
+          std::string r = "0000-00-00T00:00:00Z.";
+          std::strftime ( const_cast< char* > ( r.data( ) ), r.size( ), format_date_time_gmt, std::gmtime ( &ct ) );
+        
+          return r;
+        }
+        
+        template < typename T = std::chrono::minutes >
+        inline static auto time_zone_difference()
+        {
+          std::time_t current_time = time(0);
+          std::tm     local_tm     = *gmtime( &current_time );
+          std::time_t utc_time     = mktime( &local_tm );
+          return std::chrono::duration_cast< T >( std::chrono::duration< double >( difftime( current_time, utc_time ) ) );
+        }
+        
+        template < typename T >
+        inline static auto to_string_iso8601_jst ( const T& t = T::clock::now() )
+        {
+          using namespace std::chrono;
+          
+          const time_t ct = detail::to_time_t( t );
+          
+          std::string r = "0000-00-00T00:00:00.";
+          std::strftime ( const_cast< char* > ( r.data( ) ), r.size( ), format_date_time, std::localtime ( &ct ) );
+          
+          const auto z = time_zone_difference();
+          
+          std::stringstream rz;
+          rz
+            << ( std::signbit( z.count() ) ? "-" : "+" )
+            << std::setw( 2 ) << std::setfill( '0' )
+            << std::to_string( std::abs( duration_cast<hours>(z).count() ) )
+            << ":"
+            << std::setw( 2 ) << std::setfill( '0' )
+            << std::to_string( std::abs( duration_cast<minutes>(z).count() ) % 60 )
+            ;
+          
+          return std::string( r.data(), r.data() + r.size() - 1 ) + rz.str();
+        }
+        
+        template < typename T >
+        inline static auto to_string_iso8601 ( const T& t = T::clock::now(), const time_format f = time_format::gmt )
+        {
+          switch ( f )
+          {
+            case time_format::jst:
+              return to_string_iso8601_jst( t );
+            case time_format::gmt:
+            default: 
+              return to_string_iso8601_gmt( t );
+          }
+        }
+      }
+
+      using clock_t =
+#ifdef WRP_WONDERLAND_LOG_CLOCK
+        WRP_WONDERLAND_LOG_CLOCK
+#elif defined( _WIN32 )
+        detail::windows_high_performance_clock
+#else
+        std::chrono::high_resolution_clock
+#endif
+        ;
       
       enum class level
         : std::uint8_t
@@ -127,7 +255,7 @@ namespace wonder_rabbit_project
         f64_in_seconds_from_run
         , i64_in_seconds_from_epoch
       };
-      
+
       struct fatal_exception
         : public std::runtime_error
       {
@@ -135,27 +263,6 @@ namespace wonder_rabbit_project
           : std::runtime_error ( message )
         { }
       };
-      
-      template < class T = void >
-      auto to_string_iso8601 ( const typename clock_t::time_point& t )
-      -> std::string
-      {
-#ifdef _WIN32
-        // TDM-GCC-5.1.0 is not support %F and %T
-        //   note: mingw is supported. but we cannot predicate TDM or not.
-        constexpr auto format_date_time = "%Y-%m-%dT%H:%M:%S";
-#else
-        constexpr auto format_date_time = "%FT%T";
-#endif
-        using namespace std::chrono;
-      
-        const time_t ct = duration_cast< seconds >( t.time_since_epoch() ).count();
-      
-        std::string r = "0000-00-00T00:00:00.Z";
-        std::strftime ( const_cast< char* > ( r.data( ) ), r.size( ), format_date_time, std::gmtime ( &ct ) );
-      
-        return r;
-      }
       
       class log_stream_t;
       
@@ -272,6 +379,7 @@ namespace wonder_rabbit_project
         
         const clock_t::time_point _start_time;
         log::time_appearance _time_appearance;
+        log::time_format     _time_format;
         
         log::if_fatal      _if_fatal;
 #ifndef EMSCRIPTEN
@@ -298,6 +406,7 @@ namespace wonder_rabbit_project
         , _at_destruct_hook ( [ ]( ) { } )
         , _start_time ( clock_t::now() )
         , _time_appearance ( log::time_appearance::f64_in_seconds_from_run )
+        , _time_format ( log::time_format::gmt )
         , _if_fatal ( log::if_fatal::none )
 #ifndef EMSCRIPTEN
         , _exception_ptr ( nullptr )
@@ -355,7 +464,7 @@ namespace wonder_rabbit_project
                 , ""
                 , 0
                 , ""
-                , std::string ( "login time: " ) + to_string_iso8601 ( _start_time )
+                , std::string ( "login time: " ) + detail::to_string_iso8601( _start_time, _time_format )
               }
             );
             append_default ( std::move ( line ) );
@@ -447,7 +556,7 @@ namespace wonder_rabbit_project
           
           ( *this ) ( level::info )
               << "logout time: "
-              << to_string_iso8601 ( clock_t::now() )
+              << detail::to_string_iso8601 ( clock_t::now(), _time_format )
               ;
           _at_destruct_hook( );
         }
@@ -563,10 +672,21 @@ namespace wonder_rabbit_project
           rethrow();
           _time_appearance = a;
         }
+
+        auto time_format ( log::time_format a )
+        -> void
+        {
+          rethrow();
+          _time_format = a;
+        }
         
         auto time_appearance()
         -> log::time_appearance
         { return _time_appearance; }
+
+        auto time_format()
+        -> log::time_format
+        { return _time_format; }
       };
       
       template < class T = void >
