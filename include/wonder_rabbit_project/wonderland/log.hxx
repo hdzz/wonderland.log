@@ -29,7 +29,9 @@
 
 #define WRP_WONDERLAND_LOG_SOURCE_PARAMS __FILE__, __LINE__, WRP_WONDERLAND_LOG_FUNCTION
 
-#define LOG_INSTANCE wonder_rabbit_project::wonderland::log::log_t::instance()
+#ifndef LOG_INSTANCE
+  #define LOG_INSTANCE wonder_rabbit_project::wonderland::log::log_t::instance()
+#endif
 
 #define LOG  LOG_INSTANCE( WRP_WONDERLAND_LOG_SOURCE_PARAMS )
 #define LOGD LOG_INSTANCE( wonder_rabbit_project::wonderland::log::level::debug, WRP_WONDERLAND_LOG_SOURCE_PARAMS )
@@ -49,7 +51,10 @@
 #define LOG_TIME_APPEARANCE( a ) LOG_INSTANCE.time_appearance( a )
 
 #else
-#define LOG_INSTANCE wonder_rabbit_project::wonderland::log::log_t::instance()
+
+#ifndef LOG_INSTANCE
+  #define LOG_INSTANCE wonder_rabbit_project::wonderland::log::log_t::instance()
+#endif
 
 #define LOG  wonder_rabbit_project::wonderland::log::null_logger_t()
 #define LOGD wonder_rabbit_project::wonderland::log::null_logger_t()
